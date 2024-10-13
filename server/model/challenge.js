@@ -2,17 +2,21 @@ const mongoose = require('mongoose');
 
 const challengeSchema = new mongoose.Schema({
     selfId: {
-        type: mongoose.Schema.Types.ObjectId, 
+        type: String, 
         ref: 'User',
         required: true
     },
     partnerId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: String,
         ref: 'User',
         required: true
     },
     challenge: {
         type: String,
+        required: true
+    },
+    coins:{
+        type: Number,
         required: true
     },
     deadline: {
@@ -24,7 +28,8 @@ const challengeSchema = new mongoose.Schema({
         default: false
     },
     proofImage: {
-        type: String
+        type: String,
+        default:"default-url"
     },
     difficulty: {
         type: String,

@@ -2,12 +2,12 @@ const mongoose = require("mongoose");
 
 const rewardSchema = new mongoose.Schema({
     selfId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: String,
         ref: 'User',
         required: true
     },
     partnerId: {
-        type: mongoose.Schema.Types.ObjectId, 
+        type: String, 
         ref: 'User',
         required: true
     },
@@ -16,8 +16,9 @@ const rewardSchema = new mongoose.Schema({
         enum: ['gold', 'diamond', 'silver'],
         required: true
     },
-    description: {
-        type: String
+    reward: {
+        type: String,
+        required: true
     },
     coinsRequired: {
         type: Number,
@@ -35,9 +36,9 @@ const rewardSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
-    redeemedAt: {
+    deadline: {
         type: Date,
-        default: null
+        required:true
     }
 });
 

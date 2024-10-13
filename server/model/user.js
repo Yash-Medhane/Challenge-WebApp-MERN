@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
 
 const userSchema = new mongoose.Schema({
     username: {
         type: String,
-        required: true
+        required: true,
+        unique: true
     },
     email: {
         type: String,
@@ -25,14 +25,12 @@ const userSchema = new mongoose.Schema({
     },
     userId: {
         type: String,
-        unique: true,
-        default: uuidv4   
+        unique: true  
     },
     partnerUserId: {
         type: String,
-        default: null  
+        default: 'null'
     },
-
     profilePicture: {
         type: String,  
         default: 'default-profile-pic-url'  
@@ -42,24 +40,24 @@ const userSchema = new mongoose.Schema({
         default: ''
     },
     firstName: {
-        type: String
+        type: String,
+        default: ''
     },
     lastName: {
-        type: String
+        type: String,
+        default: ''
     },
     dateOfBirth: {
-        type: Date
+        type: Date,
+        default: null
     },
     gender: {
         type: String,  
         enum: ['Male', 'Female', 'Other']
     },
     location: {
-        type: String  
-    },
-    phoneNumber: {
-        type: String,  
-        unique: true
+        type: String,
+        default: '' 
     },
     preferences: {
         receiveNotifications: { type: Boolean, default: true },
@@ -71,6 +69,16 @@ const userSchema = new mongoose.Schema({
     },
     lastLogin: {
         type: Date  
+    },
+    isVerified: {
+        type: Boolean,
+        default: false,
+    },
+    verificationToken: {
+        type: String,
+    },
+    tokenExpires: {
+        type: Date,
     }
 });
 
