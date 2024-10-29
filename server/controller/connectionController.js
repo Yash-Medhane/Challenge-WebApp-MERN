@@ -3,27 +3,22 @@ const Notification = require('../model/notification.js');
 const mongoose = require('mongoose');
 
 exports.getUserNotifications = async (req, res) => {
-    // Assuming userId is passed in the request body
-    const userId = req.body.userId; // You can change this line to req.query.userId if you prefer using query parameters
+    const { userId } = req.params;
 
-    // Check if userId is provided
     if (!userId) {
         return res.status(400).json({ message: "User ID is required." });
     }
 
     try {
-        // Fetch notifications for the user, sorted by creation date in descending order
         const notifications = await Notification.find({ receiverId: userId }).sort({ createdAt: -1 });
 
-        // Check if notifications exist
-        if (!notifications.length) {
+        if (notifications.length === 0) {
             return res.status(404).json({ message: "No notifications found." });
         }
 
-        // Return the notifications in the response
         res.status(200).json(notifications);
     } catch (error) {
-        console.error(error);
+        console.error("Error fetching notifications:", error);
         res.status(500).json({ message: "Server error." });
     }
 };
@@ -56,7 +51,7 @@ exports.deleteNotification = async (req, res) => {
 };
 
 exports.sendPartnerRequest = async (req, res) => {
-    const { userId, partnersUsername } = req.body; 
+    const { userId, partnersUsername } = req.body;
 
     try {
         // Find the partner by username
@@ -65,6 +60,11 @@ exports.sendPartnerRequest = async (req, res) => {
         // If partner does not exist, return error
         if (!partner) {
             return res.status(404).json({ message: "Partner not found." });
+        }
+
+        // Check if the user is trying to send a request to themselves
+        if (userId === partner.userId) {
+            return res.status(400).json({ message: "You cannot send a partner request to yourself." });
         }
 
         // Find the current user by userId (using custom userId, not _id)
@@ -80,11 +80,22 @@ exports.sendPartnerRequest = async (req, res) => {
             return res.status(400).json({ message: `${partnersUsername} already has a partner.` });
         }
 
+        // Check if a notification already exists
+        const existingNotification = await Notification.findOne({
+            receiverId: partner.userId,
+            senderId: currentUser.userId,
+            type: 'partner_request'
+        });
+
+        if (existingNotification) {
+            return res.status(400).json({ message: "Partner request already sent." });
+        }
+
         // Create a notification for the partner to accept the request
         const notification = new Notification({
             receiverId: partner.userId, // Partner's userId (custom field)
             message: `${currentUser.username} wants to connect with you as a partner.`,
-            type: 'partner_request', 
+            type: 'partner_request',
             senderId: currentUser.userId // The custom userId of the user making the request
         });
 
@@ -99,60 +110,66 @@ exports.sendPartnerRequest = async (req, res) => {
     }
 };
 
+
+
 exports.acceptPartnerRequest = async (req, res) => {
-    const { notificationId, userId } = req.body; // userId should be the UUID of the current user
+    const { notificationId, userId, partnerId } = req.body; // userId and partnerId should be the UUIDs of the current user and their partner
 
     try {
-        // Validate notificationId as a Mongoose ObjectId
-        if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-            return res.status(400).json({ message: "Invalid notification ID." });
+        const user = await User.findOne({ userId });
+        const partner = await User.findOne({ userId: partnerId }); // Partner user
+
+        if (!partner) {
+            return res.status(404).json({ message: "Partner not found." });
         }
 
-        const notification = await Notification.findById(notificationId);
-
-        if (!notification) {
-            return res.status(404).json({ message: "Request not found." });
+        // Check if either user is already connected
+        if (user.isConnected || partner.isConnected) {
+            return res.status(400).json({ message: "One or both users are already connected." });
         }
 
-        notification.isAccepted = true;
-        await notification.save();
+        // Set each other as partners and mark as connected
+        user.partnerUserId = partnerId;
+        user.isConnected = true;
 
-        // Check if receiverId is a valid UUID format (UUIDs are your custom format)
-        if (!isValidUUID(notification.receiverId)) {
-            return res.status(400).json({ message: "Invalid receiver ID." });
+        partner.partnerUserId = userId;
+        partner.isConnected = true;
+
+        // Save both users
+        await user.save();
+        await partner.save();
+
+        // Attempt to delete notification and check if it was found and deleted
+        const deletedNotification = await Notification.findByIdAndDelete(notificationId);
+        if (!deletedNotification) {
+            return res.status(404).json({ message: "Notification not found." });
         }
 
-        // Update User B's partnerId and isConnected
-        const userB = await User.findOne({ userId: notification.receiverId }); // Assuming userId is stored as UUID
+        res.status(200).json({ message: "Users successfully connected as partners." });
+    } catch (error) {
+        console.error("Error during partner connection:", error);
+        res.status(500).json({ message: "Server error." });
+    }
+};
 
-        if (!userB) {
-            return res.status(404).json({ message: "User not found." });
+
+exports.getNotificationCount = async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        if (!userId) {
+            return res.status(400).json({ message: "User ID is required." });
         }
 
-        userB.partnerId = notification.senderId; // senderId should be the UUID of User A
-        userB.isConnected = true;
-        userB.partnerUserId = notification.senderId;
-        
-        await userB.save();
+        const notificationCount = await Notification.countDocuments({ receiverId: userId }) || 0;
 
-        // Send a reverse notification to User A to confirm the partnership
-        const confirmationNotification = new Notification({
-            receiverId: notification.senderId, // senderId is a UUID
-            senderId: userId, // userId should be the UUID of the current user
-            message: `${userB.username} has accepted your request. Confirm the partnership.`,
-            type: 'partner_confirm',
-            isAccepted: false
-        });
-
-        await confirmationNotification.save();
-        await Notification.deleteOne({ _id: notificationId });
-
-        res.status(200).json({ message: "Request accepted. Waiting for confirmation from the other user." });
+        res.status(200).json({ count: notificationCount });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error." });
     }
 };
+
 
 // Function to validate UUID
 function isValidUUID(id) {
@@ -161,36 +178,4 @@ function isValidUUID(id) {
 }
 
 
-// Confirm Partner Request (User A confirms the partnership)
-exports.confirmPartnerRequest = async (req, res) => {
-    const { notificationId, userId } = req.body; // userId is the user confirming the partnership
 
-    try {
-        // Find the notification by your custom notificationId
-        const notification = await Notification.findOne({ _id: notificationId }); // Use findOne instead of findById
-
-        if (!notification) {
-            return res.status(404).json({ message: "Request not found." });
-        }
-
-        // Update User A's partnerId and isConnected
-        const userA = await User.findOne({ userId: notification.receiverId }); // Find User A by your custom userId field
-        if (!userA) {
-            return res.status(404).json({ message: "User A not found." });
-        }
-        
-        // Update userA's details
-        userA.partnerId = notification.senderId; // User B becomes partner
-        userA.isConnected = true;
-        userA.partnerUserId = notification.senderId;
-        await userA.save();
-
-        // Delete the notification as partnership is confirmed
-        await Notification.deleteOne({ _id: notificationId }); // Use deleteOne instead of findByIdAndDelete
-
-        res.status(200).json({ message: "Partnership confirmed successfully." });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error." });
-    }
-};

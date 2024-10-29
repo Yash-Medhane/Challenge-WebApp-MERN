@@ -3,10 +3,10 @@ const User = require('../model/user');
 const mongoose = require('mongoose');
 
 exports.createPartnersChallenge = async (req, res) => {
-    const { selfId, partnerId, challenge, deadline, proofRequired, difficulty,coins } = req.body;
+    const { selfId, challenge, deadline, proofRequired, difficulty, coins } = req.body;
 
     // Validate input data
-    if (!selfId || !partnerId || !challenge || !deadline || !difficulty) {
+    if (!selfId || !challenge || !deadline || !difficulty) {
         return res.status(400).json({ message: 'All fields are required.' });
     }
 
@@ -17,8 +17,12 @@ exports.createPartnersChallenge = async (req, res) => {
     }
 
     try {
-        // Check if the partner exists
-        const partner = await User.findOne({ partnerUserId: partnerId });
+        const user = await User.findOne({ userId: selfId });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const partner = await User.findOne({ userId: user.partnerUserId });
         if (!partner) {
             return res.status(404).json({ message: 'Partner not found.' });
         }
@@ -30,13 +34,13 @@ exports.createPartnersChallenge = async (req, res) => {
 
         // Create the challenge object
         const newChallenge = new Challenge({
-            selfId: partnerId,  // Set partnerId as selfId
-            partnerId: selfId,  // Set selfId as partnerId
+            selfId: user.partnerUserId,  // Set selfId as selfId
+            partnerId: selfId,  // Set partnerId correctly
             challenge,
             deadline,
             proofRequired,
             difficulty,
-            coins:coins,
+            coins: coins,
             status: 'pending' // Set the initial status to 'pending'
         });
 
@@ -44,10 +48,11 @@ exports.createPartnersChallenge = async (req, res) => {
         const savedChallenge = await newChallenge.save();
         res.status(201).json(savedChallenge);
     } catch (error) {
-        console.error(error); // Log the error for debugging
+        console.error('Error creating challenge:', error.message); // Log the specific error message
         res.status(500).json({ message: 'Server error.' });
     }
 };
+
 
 
 exports.getUserDashboardData = async (req, res) => {
@@ -65,6 +70,7 @@ exports.getUserDashboardData = async (req, res) => {
             username:user.username,
             profileUrl:user.profilePicture,
             theme:user.preferences.theme,
+            isConnected:user.isConnected,
             coins: user.coins,
             pendingChallenges: [],
             completedChallenges: [],
@@ -80,9 +86,6 @@ exports.getUserDashboardData = async (req, res) => {
                     { partnerId: user.partnerUserId }
                 ]
             });
-
-            // Log the challenges fetched for debugging
-            console.log('Fetched challenges:', challenges);
 
             // Filter challenges into pending and completed
             dashboardData.pendingChallenges = challenges.filter(challenge => challenge.status === 'pending');
@@ -100,18 +103,26 @@ exports.getUserDashboardData = async (req, res) => {
 };
 
 exports.getPartnersChallenges = async (req, res) => {
-    const { partnerId } = req.params; // Get the selfId from the request parameters
+    const { userId } = req.params; // Get the userId from the request parameters
 
     try {
-        // Find all challenges where selfId matches
-        const challenges = await Challenge.find({ selfId: partnerId });
+  
+        const user = await User.findOne({ userId: userId });
+        
+        // Check if the user exists
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
 
-        // Check if any challenges are found
+        // Find all challenges where partnerUserId matches the user's partnerUserId
+        const challenges = await Challenge.find({ selfId: user.partnerUserId });
+    
         if (challenges.length === 0) {
             return res.status(404).json({ message: "No challenges found for this user." });
         }
 
-        // Check if any challenges have a null partnerId
+
+        // Check if any challenges have a null partnerUserId
         const challengesWithNullPartner = challenges.filter(challenge => challenge.partnerId === null);
         if (challengesWithNullPartner.length > 0) {
             return res.status(200).json({ 
@@ -120,6 +131,7 @@ exports.getPartnersChallenges = async (req, res) => {
             });
         }
 
+        // If no issues, return the found challenges
         res.status(200).json(challenges);
     } catch (error) {
         console.error(error); // Log the error for debugging
@@ -127,42 +139,6 @@ exports.getPartnersChallenges = async (req, res) => {
     }
 };
 
-
-exports.updatePartnersChallenge = async (req, res) => {
-    const { challengeId } = req.params; // Destructure challengeId from params
-    const updateData = req.body; // Extract the update data from the request body
-
-    try {
-        // Validate the provided update data (optional, can be customized based on requirements)
-        if (!updateData || Object.keys(updateData).length === 0) {
-            return res.status(400).json({ message: "No update data provided." });
-        }
-
-        // Check if challengeId is a valid ObjectId
-        if (!mongoose.isValidObjectId(challengeId)) {
-            return res.status(400).json({ message: "Invalid challenge ID." });
-        }
-
-        // Update the challenge with the given ID
-        const updatedChallenge = await Challenge.findByIdAndUpdate(challengeId, updateData, { new: true, runValidators: true });
-
-        // Check if the challenge was found and updated
-        if (!updatedChallenge) {
-            return res.status(404).json({ message: "Challenge not found." });
-        }
-
-        // Return the updated challenge
-        res.status(200).json(updatedChallenge);
-    } catch (error) {
-        // Log the error for debugging purposes
-        console.error(error);
-        // Check if the error is a validation error from mongoose
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ message: error.message });
-        }
-        res.status(500).json({ message: "Server error." });
-    }
-};
 
 
 exports.deletePartnersChallenge = async (req, res) => {
@@ -186,53 +162,50 @@ exports.deletePartnersChallenge = async (req, res) => {
         res.status(500).json({ message: "Server error." });
     }
 };
-
 exports.completeChallenge = async (req, res) => {
-    const { challengeId, proofUrl } = req.body;
+    const { taskId } = req.body;
 
     try {
-
-        if (!mongoose.isValidObjectId(challengeId) || !proofUrl) {
-            return res.status(400).json({ message: 'Challenge ID and proof URL are required.' });
+        if (!mongoose.isValidObjectId(taskId)) {
+            return res.status(400).json({ message: 'Task ID and proof are required.' });
         }
 
         // Find the challenge by ID
-        const completeChallenge = await Challenge.findById(challengeId);
+        const challenge = await Challenge.findById(taskId);
 
         // Check if the challenge exists
-        if (!completeChallenge) {
+        if (!challenge) {
             return res.status(404).json({ message: "Challenge not found." });
         }
 
         // Check if the challenge is already completed
-        if (completeChallenge.status === 'completed') {
+        if (challenge.status === 'completed') {
             return res.status(400).json({ message: 'Challenge is already completed.' });
         }
 
         // Check if the challenge has expired
         const currentDate = new Date();
-        const deadlineDate = new Date(completeChallenge.deadline); // Assuming `deadline` is stored in the Challenge model
+        const deadlineDate = new Date(challenge.deadline); // Assuming `deadline` is stored in the Challenge model
 
         // If the challenge has expired
         if (currentDate > deadlineDate) {
             // Delete the expired challenge
-            await Challenge.findByIdAndDelete(challengeId); // Delete the challenge from the database
+            await Challenge.findByIdAndDelete(taskId); // Delete the challenge from the database
             return res.status(400).json({ message: 'Challenge has expired! No coins will be awarded.' });
         }
 
-        // Update the challenge status and proof URL
-        completeChallenge.status = 'completed';
-        completeChallenge.proofImage = proofUrl; // Assuming you want to save the proof URL in the Challenge model
+        // Update the challenge status and proof image URL
+        challenge.status = 'completed';
 
         // Save the updated challenge
-        await completeChallenge.save();
+        await challenge.save();
 
         // Add coins to the user for completing the challenge
-        const userId = completeChallenge.selfId; // Assuming selfId is the user who created the challenge
-        const coinsEarned = completeChallenge.coins; // Set the number of coins to be awarded (modify as needed)
+        const userId = challenge.selfId; // Assuming selfId is the user who created the challenge
+        const coinsEarned = challenge.coins; // Set the number of coins to be awarded
 
         // Find the user and update their coins
-        const user = await User.findOne({ userId: userId }); // Correct method casing
+        const user = await User.findOne({userId}); // Use findById for the user
 
         if (user) {
             user.coins += coinsEarned; // Increase user's coins
@@ -244,7 +217,7 @@ exports.completeChallenge = async (req, res) => {
         // Respond with the updated challenge data and coins added
         res.status(200).json({
             message: 'Challenge completed successfully.',
-            challenge: completeChallenge,
+            challenge,
             coinsAdded: coinsEarned
         });
     } catch (error) {

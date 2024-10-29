@@ -27,14 +27,13 @@ exports.loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Generate a token
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
         res.status(200).json({
             message: 'Login successful',
             token,
             user: {
-                id: user._id,
+                id: user.userId,
                 username: user.username,
                 email: user.email,
             }
@@ -54,10 +53,14 @@ const transporter = nodemailer.createTransport({
 });
 
 exports.registerUser = async (req, res) => {
-    const { username, email, password } = req.body;
+    const { username, email, password, confirmPassword } = req.body;
+
+    if (!username || !email || !password || !confirmPassword) {
+        return res.status(400).json({ message: "All fields are required" });
+    }
+
 
     try {
-        // Check if the user already exists
         const existingUser = await User.findOne({ email });
 
         if (existingUser) {
@@ -172,7 +175,7 @@ exports.verifyEmail = async (req, res) => {
 };
 
 
-exports.getUser = async (req,res)=>{
+exports.getUser = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
 
@@ -181,9 +184,15 @@ exports.getUser = async (req,res)=>{
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.userId;
+        const userIdFromToken = decoded.userId; // Get userId from the token
+        const requestedUserId = req.params.userId; // Get userId from route parameters
 
-        const user = await User.findById(userId).select('-password'); // Exclude the password field
+        // Check if the requested userId matches the userId from the token
+        if (userIdFromToken !== requestedUserId) {
+            return res.status(403).json({ message: 'Forbidden: You can only access your own profile' });
+        }
+
+        const user = await User.findOne({userId:requestedUserId}).select('-password') // Exclude the password field
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
@@ -213,7 +222,8 @@ exports.getUser = async (req,res)=>{
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
-}
+};
+
 
 exports.updateUser = async (req, res) => {
     try {
@@ -224,11 +234,23 @@ exports.updateUser = async (req, res) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.userId;
+        const userIdFromToken = decoded.userId; // User ID from the token
+        const requestedUserId = req.params.userId; // Get userId from route parameters
 
-        const { username, email, coins, isConnected, partnerUserId, profilePicture, bio, firstName, lastName, dateOfBirth, gender, location, phoneNumber, preferences } = req.body;
+        // Check if the requested userId matches the userId from the token
+        if (userIdFromToken !== requestedUserId) {
+            return res.status(403).json({ message: 'Forbidden: You can only access your own profile' });
+        }
 
-        const updatedUser = await User.findByIdAndUpdate(userId, {
+        // Find the user by custom userId and exclude password from response
+        const user = await User.findOne({ userId: requestedUserId }).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Destructure the fields from the request body
+        const {
             username,
             email,
             coins,
@@ -243,20 +265,37 @@ exports.updateUser = async (req, res) => {
             location,
             phoneNumber,
             preferences
-        }, { new: true, runValidators: true }).select('-password'); // Exclude password
+        } = req.body;
 
-        if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found' });
-        }
+        // Update the user document in the database
+        const updatedUser = await User.findOneAndUpdate(
+            { userId: requestedUserId }, // Use custom userId for the update
+            {
+                username,
+                email,
+                coins,
+                isConnected,
+                partnerUserId,
+                profilePicture,
+                bio,
+                firstName,
+                lastName,
+                dateOfBirth,
+                gender,
+                location,
+                phoneNumber,
+                preferences
+            },
+            { new: true, runValidators: true } // Return the updated user and validate
+        ).select('-password'); // Exclude password from response
 
-        // Updated response with all user data
+        // Return the updated user data
         res.status(200).json({
-            id: updatedUser._id,
+            id: updatedUser.userId, // Return the custom userId
             username: updatedUser.username,
             email: updatedUser.email,
             coins: updatedUser.coins,
             isConnected: updatedUser.isConnected,
-            userId: updatedUser.userId,
             partnerUserId: updatedUser.partnerUserId,
             profilePicture: updatedUser.profilePicture,
             bio: updatedUser.bio,
@@ -275,6 +314,7 @@ exports.updateUser = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
 
 exports.deleteUser = async (req, res) => {
     try {
