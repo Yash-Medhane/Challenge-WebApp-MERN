@@ -13,7 +13,7 @@ const Request = ({ userId }) => {
 
     try {
       const response = await axios.post(
-        `http://localhost:5000/dashboard/${userId}/partner/request`, 
+        `http://192.168.37.86:5000/dashboard/${userId}/partner/request`, 
         { userId, partnersUsername }
       );
 

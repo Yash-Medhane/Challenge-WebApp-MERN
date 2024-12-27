@@ -11,7 +11,7 @@ const DashboardContent = ({ userId }) => {
     const [error, setError] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false); // New state for the Create modal
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false); 
     const [taskId, setTaskId] = useState(null);
     const [taskName, setTaskName] = useState('');
 
@@ -29,7 +29,15 @@ const DashboardContent = ({ userId }) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.get(`http://localhost:5000/dashboard/${userId}`);
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error("Token not found");
+            }
+            const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
             const { pendingChallenges, completedChallenges, isConnected } = response.data;
 
             setIsConnected(isConnected);
@@ -51,7 +59,14 @@ const DashboardContent = ({ userId }) => {
 
     const completeTask = async () => {
         try {
-            await axios.post(`http://localhost:5000/dashboard/${userId}/challenges/completed`, {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error("Token not found");
+            }
+            await axios.post(`http://192.168.37.86:5000/dashboard/${userId}/challenges/completed`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                }, 
                 taskId,
             });
             closeModal();
@@ -158,53 +173,55 @@ const DashboardContent = ({ userId }) => {
                         <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 w-full">
                             <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-green-400">Pending Tasks</h2>
                             {pendingTasks.length > 0 ? (
-                                <ul className="list-disc list-inside space-y-4 text-gray-300">
-                                    {pendingTasks.map(task => (
-                                        <li key={task.id} className={`mb-3 flex flex-col md:flex-row justify-between items-start md:items-center p-4 rounded-lg shadow-md transition-transform transform hover:scale-105 ${difficultyColors[task.difficulty]}`}>
-                                            <div className="flex flex-col mb-2 md:mb-0">
-                                                <span className={`font-bold text-white text-lg ${difficultyColors[task.difficulty]}`}>{task.challenge}</span>
-                                                <span className="text-sm text-gray-400">Due: {new Date(task.deadline).toLocaleDateString()}</span>
-                                            </div>
-                                            <div className="flex items-center">
-                                                <span className="text-sm text-slate-300 font-bold mr-3 flex items-center">
-                                                    <FaCoins className="inline mr-1 text-yellow-300 h-5 w-5" />
-                                                    {task.coins} 
-                                                </span>
-                                                <button
-                                                    onClick={() => handleCompleteTask(task)}
-                                                    className="bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded-md transition duration-200"
-                                                >
-                                                    Complete
-                                                </button>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-gray-500">No pending tasks at the moment.</p>
-                            )}
+    <ul className="list-disc list-inside space-y-4 text-gray-300">
+        {pendingTasks.map(task => (
+            <li key={task._id} className={`mb-3 flex flex-col md:flex-row justify-between items-start md:items-center p-4 rounded-lg shadow-md transition-transform transform hover:scale-105 ${difficultyColors[task.difficulty]}`}>
+                <div className="flex flex-col mb-2 md:mb-0">
+                    <span className={`font-bold text-white text-lg ${difficultyColors[task.difficulty]}`}>{task.challenge}</span>
+                    <span className="text-sm text-gray-400">Due: {new Date(task.deadline).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center">
+                    <span className="text-sm text-slate-300 font-bold mr-3 flex items-center">
+                        <FaCoins className="inline mr-1 text-yellow-300 h-5 w-5" />
+                        {task.coins} 
+                    </span>
+                    <button
+                        onClick={() => handleCompleteTask(task)}
+                        className="bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded-md transition duration-200"
+                    >
+                        Complete
+                    </button>
+                </div>
+            </li>
+        ))}
+    </ul>
+) : (
+    <p className="text-gray-500">No pending tasks at the moment.</p>
+)}
+
                         </div>
 
                         <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 w-full">
                             <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-blue-400">Completed Tasks</h2>
                             {completedTasks.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                    {completedTasks.map(task => (
-                                        <div key={task.id} className="bg-gradient-to-br from-purple-600 to-blue-600 p-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl">
-                                            <h3 className="font-bold text-white flex items-center text-lg mb-2">
-                                                <FaCheckCircle className="text-green-300 mr-2 animate-bounce" />
-                                                {task.challenge}
-                                            </h3>
-                                            <p className="text-sm text-white mb-1">
-                                                <FaCoins className="inline mr-1 text-yellow-300" />
-                                                {task.coins} Coins
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-gray-500">No completed tasks yet.</p>
-                            )}
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {completedTasks.map(task => (
+            <div key={task._id} className="bg-gradient-to-br from-purple-600 to-blue-600 p-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 hover:shadow-xl">
+                <h3 className="font-bold text-white flex items-center text-lg mb-2">
+                    <FaCheckCircle className="text-green-300 mr-2 animate-bounce" />
+                    {task.challenge}
+                </h3>
+                <p className="text-sm text-white mb-1">
+                    <FaCoins className="inline mr-1 text-yellow-300" />
+                    {task.coins} Coins
+                </p>
+            </div>
+        ))}
+    </div>
+) : (
+    <p className="text-gray-500">No completed tasks yet.</p>
+)}
+
                         </div>
                     </div>
                 ) : (

@@ -7,6 +7,9 @@ import Profile from './Profile';
 import Request from './Request';
 import Challenges from './Challenges';
 import Chat from './Chat';
+import Rewards from './Rewards';
+import Store from './Store';
+import ContactForm from './ContactForm';
 
 const Dashboard = () => {
     const { userId } = useParams(); // Extract userId from URL params
@@ -22,8 +25,10 @@ const Dashboard = () => {
                         <Route path="/profile" element={<Profile userId={userId} />} />
                         <Route path="/partner/request" element={<Request userId={userId} />} />  
                         <Route path="/challenges" element={<Challenges userId={userId} />} />  
-                        <Route path="/chat" element={<Chat userId={userId} />} />  
-                        
+                        <Route path="/chat" element={<Chat userId={userId} />} /> 
+                        <Route path="/rewards" element={<Rewards userId={userId}/>}/>
+                        <Route path="/store" element={<Store userId={userId}/>}/>
+                        <Route path='/contact' element={<ContactForm/>}/>
                     </Routes>
                 </div>
             </div>

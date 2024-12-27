@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { FaBars, FaTimes, FaHome, FaUser, FaCog, FaGamepad, FaComments, FaStore, FaUserFriends } from 'react-icons/fa';
+import { FaBars, FaTimes, FaHome, FaUser,FaPhoneAlt, FaComments, FaStore} from 'react-icons/fa';
 
 const Sidebar = ({ userId }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -14,8 +14,8 @@ const Sidebar = ({ userId }) => {
             {/* Menu button */}
             <button 
                 onClick={toggleSidebar} 
-                className={`p-3 bg-blue-600 text-white rounded-md focus:outline-none absolute top-4 transition-transform duration-300 hover:scale-90 z-50 ${isOpen ? 'left-64' : 'left-4'}`}
-                style={{ transition: 'left 0.3s ease' }} 
+                className={`p-3 bg-blue-600 text-white rounded-md focus:outline-none absolute top-3 sm:top-2 transition-transform duration-300 hover:scale-90 z-50 ${isOpen ? 'left-64' : 'left-4'}`}
+                style={{ transition: 'left 0.4s ease' }} 
             >
                 {isOpen ? <FaTimes className="h-6 w-6" /> : <FaBars className="h-6 w-6" />}
             </button>
@@ -46,16 +46,6 @@ const Sidebar = ({ userId }) => {
                     </li>
                     <li>
                         <NavLink 
-                            to={`/dashboard/${userId}/games`}
-                            className="flex items-center hover:text-blue-400 transition duration-200 ease-in-out p-2 rounded-md"
-                            onClick={toggleSidebar}
-                        >
-                            <FaGamepad className="mr-2" />
-                            Games
-                        </NavLink>
-                    </li>
-                    <li>
-                        <NavLink 
                             to={`/dashboard/${userId}/chat`}
                             className="flex items-center hover:text-blue-400 transition duration-200 ease-in-out p-2 rounded-md"
                             onClick={toggleSidebar}
@@ -76,12 +66,12 @@ const Sidebar = ({ userId }) => {
                     </li>
                     <li>
                         <NavLink 
-                            to={`/dashboard/${userId}/settings`}
+                            to={`/dashboard/${userId}/contact`}
                             className="flex items-center hover:text-blue-400 transition duration-200 ease-in-out p-2 rounded-md"
                             onClick={toggleSidebar}
                         >
-                            <FaCog className="mr-2" />
-                            Settings
+                            <FaPhoneAlt className="mr-2" />
+                            ContactUs
                         </NavLink>
                     </li>
                 </ul>

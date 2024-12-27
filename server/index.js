@@ -6,7 +6,8 @@ const path = require('path');
 const multer = require('multer');
 const http = require('http'); // Import HTTP module
 const { Server } = require('socket.io'); // Import Socket.IO
-const userRoutes = require('./routes/userRoute');
+const nodemailer = require('nodemailer'); // Import nodemailer
+const userRoutes = require('./routes/userRoute'); // Import user routes
 
 // Load environment variables
 dotenv.config();
@@ -15,6 +16,52 @@ const PORT = process.env.PORT || 5000;
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Email sending route
+app.post('/send', async (req, res) => {
+    const { email, message, category } = req.body;
+
+    if (!email || !message || !category) {
+        return res.status(400).send('Email, message, and category are required.');
+    }
+
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
+        });
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER, // Sender email address
+            to: process.env.EMAIL,        // Recipient email address (website owner)
+            subject: '✨ New Website Contact Inquiry Received!',
+            text: `
+                📬 New Inquiry Details
+
+                🧑‍💻 Sender Information:
+                - Email: ${email}
+                - Type of Message: ${category}
+
+                📝 Message Content:
+                ---------------------------------------------------
+                "${message}"
+                ---------------------------------------------------
+
+                📅 Received On: ${new Date().toLocaleString()}
+            `,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent:', info.response);
+        res.status(200).send('Email sent successfully.');
+    } catch (error) {
+        console.error('Error sending email:', error);
+        res.status(500).send(`Error sending email: ${error.message}`);
+    }
+});
 
 // MongoDB connection
 const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/challengeApp';
@@ -30,7 +77,7 @@ const storage = multer.diskStorage({
     destination: './uploads/',
     filename: (req, file, cb) => {
         cb(null, Date.now() + path.extname(file.originalname)); // Append timestamp to avoid filename collisions
-    }
+    },
 });
 
 // Initialize multer for file upload
@@ -47,7 +94,7 @@ const upload = multer({
         } else {
             cb(new Error('Invalid file type! Only images and documents are allowed.'));
         }
-    }
+    },
 });
 
 // Image upload route
@@ -61,6 +108,11 @@ app.post('/upload', upload.single('file'), (req, res) => {
 // Serve static files from the uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Test route
+app.get('/test', (req, res) => {
+    res.send("Backend is accessible");
+});
+
 // User routes
 app.use('/', userRoutes);
 
@@ -72,26 +124,26 @@ const io = new Server(server, {
     },
 });
 
+// Rooms object to manage game states
+const rooms = {}; // Initialize rooms object
+
 // WebSocket connection handling
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    // Join chat room
     socket.on('joinRoom', ({ userId, partnerId }) => {
-        socket.join(userId);
-        socket.join(partnerId);
+        const roomId = `${userId}-${partnerId}`; // Create a unique room ID
+        socket.join(roomId);
+        console.log(`User ${socket.id} joined room: ${roomId}`);
     });
 
-    // Listen for sending messages
-    socket.on('sendMessage', (messageData) => {
-        // Broadcast the message to the partner
-        io.to(messageData.receiverId).emit('receiveMessage', messageData);
-    });
-
-    // Listen for sending files
-    socket.on('sendFile', (fileData) => {
-        // Broadcast the file data to the partner
-        io.to(fileData.receiverId).emit('receiveFile', fileData);
+    socket.on('makeMove', ({ roomId, index }) => {
+        const room = rooms[roomId];
+        if (room && room.board[index] === null) {
+            room.board[index] = room.currentPlayer;
+            room.currentPlayer = room.currentPlayer === 'X' ? 'O' : 'X';
+            io.to(roomId).emit('gameUpdate', room);
+        }
     });
 
     socket.on('disconnect', () => {
@@ -100,6 +152,6 @@ io.on('connection', (socket) => {
 });
 
 // Start the server
-server.listen(PORT, () => {
-    console.log(`Server running at ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running at http://localhost:${PORT}`);
 });

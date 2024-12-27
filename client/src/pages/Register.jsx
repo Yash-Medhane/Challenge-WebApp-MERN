@@ -37,7 +37,7 @@ const Register = () => {
         }
 
         try {
-            const response = await axios.post('http://localhost:5000/register', formData);
+            const response = await axios.post('http://192.168.37.86:5000/register', formData);
             setMessage(response.data.message);
             setError('');
             if (response.status === 201) {

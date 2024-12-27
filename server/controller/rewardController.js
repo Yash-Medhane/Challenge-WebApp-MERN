@@ -1,42 +1,67 @@
 const Reward = require('../model/Reward'); // Import your Reward model
 const User = require('../model/user')
 
-exports.createReward = async (req, res) => {
-    const { selfId, partnerId, rewardType, reward, coinsRequired,deadline } = req.body;
+exports.createPartnersReward = async (req, res) => {
+    const { selfId, rewardType, reward, coinsRequired, deadline } = req.body;
+
+    // Validate input data
+    if (!selfId || !rewardType || !reward || !coinsRequired || !deadline) {
+        return res.status(400).json({ message: 'All fields are required.' });
+    }
+
+    // Validate reward type
+    const validRewardTypes = ['gold', 'diamond', 'silver'];
+    if (!validRewardTypes.includes(rewardType)) {
+        return res.status(400).json({ message: 'Invalid reward type.' });
+    }
 
     try {
-        // Validate required fields
-        if (!selfId || !partnerId || !rewardType || !coinsRequired || !deadline) {
-            return res.status(400).json({ message: 'All fields are required.' });
+        // Find the user
+        const user = await User.findOne({ userId: selfId });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
         }
 
-        // Create a new reward
+        // Find the partner
+        const partner = await User.findOne({ userId: user.partnerUserId });
+        if (!partner) {
+            return res.status(404).json({ message: 'Partner not found.' });
+        }
+
+        // Check if the partner is connected
+        if (!partner.isConnected) {
+            return res.status(400).json({ message: 'Partner is not connected. Connect your partner now.' });
+        }
+
+        // Create the reward object
         const newReward = new Reward({
-            selfId:partnerId,
-            partnerId:selfId,
+            selfId: user.partnerUserId, // Set selfId as partner's ID
+            partnerId: selfId, // Set partnerId correctly
             rewardType,
             reward,
             coinsRequired,
-            deadline
+            deadline,
+            redeemed: false // Initial state is not redeemed
         });
 
         // Save the reward to the database
         const savedReward = await newReward.save();
-
-        // Respond with the created reward data
-        res.status(201).json({
-            message: 'Reward created successfully.',
-            reward: savedReward
-        });
+        res.status(201).json(savedReward);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error creating reward:', error.message); // Log the specific error message
+        res.status(500).json({ message: 'Server error.' });
     }
 };
 
+
 // Get rewards for a specific user
 exports.getUserRewards = async (req, res) => {
+    
     const userId = req.params.userId;
+    console.log('Route hit:', req.url);
+console.log('Params:', req.params);
+
+    console.log(userId);
 
     try {
         // Find the user by ID
@@ -60,13 +85,14 @@ exports.getUserRewards = async (req, res) => {
             ]
         });
 
-        // Check if any rewards were found
-        if (rewards.length === 0) {
-            return res.status(404).json({ message: 'No rewards found for this user.' });
+        const currentDate = new Date();
+        const newRewards = rewards.filter(reward => new Date(reward.deadline) >= currentDate);
+        if (newRewards.length === 0) {
+            return res.status(404).json({ message: 'No rewards found !' });
         }
 
         // Return rewards found
-        res.status(200).json(rewards);
+        res.status(200).json(newRewards);
     } catch (error) {
         console.error(error); // Log the error for debugging
         res.status(500).json({ message: 'Server error.' });
@@ -84,7 +110,7 @@ exports.getPartnerReward = async (req, res) => {
         
         // Check if the user exists
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(404).json({ message: 'User not found !' });
         }
 
         // Check if the user has a partner
@@ -100,13 +126,14 @@ exports.getPartnerReward = async (req, res) => {
             ]
         });
 
-        // Check if any rewards were found
-        if (rewards.length === 0) {
-            return res.status(404).json({ message: 'No rewards found for this user.' });
+        const currentDate = new Date();
+        const newRewards = rewards.filter(reward => new Date(reward.deadline) >= currentDate);
+        if (newRewards.length === 0) {
+            return res.status(404).json({ message: 'No rewards found.' });
         }
 
         // Return rewards found
-        res.status(200).json(rewards);
+        res.status(200).json(newRewards);
     } catch (error) {
         console.error(error); // Log the error for debugging
         res.status(500).json({ message: 'Server error.' });
@@ -134,16 +161,15 @@ exports.deletePartnerReward = async (req, res) => {
 
 // Redeem a specific reward
 exports.redeemReward = async (req, res) => {
+    const rewardId = req.params.rewardId;
+    console.log("rewardId",rewardId);
     try {
-        // Find the reward by ID
-        const reward = await Reward.findById(req.params.rewardId);
+        const reward = await Reward.findById(rewardId);
 
-        // Check if the reward exists
         if (!reward) {
             return res.status(404).json({ message: "Reward not found" });
         }
 
-        // Check if the reward has already been redeemed
         if (reward.redeemed) {
             return res.status(400).json({ message: "Reward already redeemed." });
         }

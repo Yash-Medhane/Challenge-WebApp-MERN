@@ -1,56 +1,74 @@
-import React, { useEffect, useState } from 'react'; 
+import React, { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
+import { FaUserCircle } from 'react-icons/fa';
 
-const Chat = ({ userId }) => {
+const ChatApp = ({ userId }) => {
     const [socket, setSocket] = useState(null);
     const [messages, setMessages] = useState(() => {
-        // Load messages from local storage if available
         const savedMessages = localStorage.getItem('chatMessages');
         return savedMessages ? JSON.parse(savedMessages) : [];
     });
     const [message, setMessage] = useState('');
     const [userData, setUserData] = useState(null);
-    const [partnerId, setPartnerId] = useState(null); // Store partner ID
+    const [partnerId, setPartnerId] = useState(null);
+    const [partnerName, setPartnerName] = useState('Partner');
+    const [typing, setTyping] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
 
     useEffect(() => {
-        const fetchData = async () => {
+        // Fetch user data and partner ID
+        const fetchUserData = async () => {
             try {
-                const response = await axios.get(`http://localhost:5000/dashboard/${userId}/chat/get`);
+                const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}/chat/get`);
                 setUserData(response.data);
                 if (response.data) {
-                    setPartnerId(response.data.partnerUserId); // Set the partner ID
+                    setPartnerId(response.data.partnerUserId);
                 }
             } catch (error) {
-                console.log("Error fetching user data: ", error);
+                console.error("Error fetching user data: ", error);
             }
         };
 
-        fetchData();
+        fetchUserData();
+    }, [userId]);
 
-        const newSocket = io('http://localhost:5000'); // Adjust the URL based on your server
+    useEffect(() => {
+        // Fetch partner's name when partnerId is updated
+        const fetchPartnerName = async () => {
+            if (!partnerId) return;
+            try {
+                const response = await axios.get(`http://192.168.37.86:5000/dashboard/${partnerId}/chat/get`);
+                setPartnerName(response.data.username || 'Partner');
+            } catch (error) {
+                console.error("Error fetching partner data: ", error);
+            }
+        };
+
+        fetchPartnerName();
+    }, [partnerId]);
+
+    useEffect(() => {
+        const newSocket = io('http://192.168.37.86:5000');
         setSocket(newSocket);
 
-        // Join the chat room
         newSocket.on('connect', () => {
             if (userId && partnerId) {
                 newSocket.emit('joinRoom', { userId, partnerId });
             }
         });
 
-        // Listen for incoming messages
         newSocket.on('receiveMessage', (messageData) => {
-            if (messageData.senderId !== userId) {
-                setMessages((prevMessages) => {
-                    const updatedMessages = [...prevMessages, messageData];
-                    // Save updated messages to local storage
-                    localStorage.setItem('chatMessages', JSON.stringify(updatedMessages));
-                    return updatedMessages;
-                });
-            }
+            setMessages((prevMessages) => {
+                const updatedMessages = [...prevMessages, messageData];
+                localStorage.setItem('chatMessages', JSON.stringify(updatedMessages));
+                return updatedMessages;
+            });
         });
 
-        // Cleanup on component unmount
+        newSocket.on('typing', () => setIsTyping(true));
+        newSocket.on('stopTyping', () => setIsTyping(false));
+
         return () => {
             newSocket.disconnect();
         };
@@ -68,55 +86,70 @@ const Chat = ({ userId }) => {
             socket.emit('sendMessage', messageData);
             setMessages((prevMessages) => {
                 const updatedMessages = [...prevMessages, messageData];
-                // Save updated messages to local storage
                 localStorage.setItem('chatMessages', JSON.stringify(updatedMessages));
                 return updatedMessages;
             });
             setMessage('');
+            socket.emit('stopTyping');
         }
     };
 
     const handleClearChat = () => {
-        // Clear messages from state and local storage
         setMessages([]);
         localStorage.removeItem('chatMessages');
     };
 
     return (
-        <div className="flex flex-col h-screen max-w-lg mx-auto bg-gradient-to-b from-blue-500 to-purple-500 rounded-lg shadow-xl overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-4 bg-white rounded-t-lg">
+        <div className="flex flex-col h-screen max-w-lg mx-auto bg-gradient-to-br from-purple-600 to-blue-500 rounded-lg shadow-lg overflow-hidden">
+            {/* Header Section */}
+            <div className="flex items-center justify-between bg-gray-800 p-4 text-white shadow-md">
+                <div className="flex items-center space-x-2">
+                    {/* Human Icon */}
+                    <FaUserCircle className="text-blue-400 text-4xl" />
+                    <h2 className="font-bold">{partnerName}</h2>
+                </div>
+                <button
+                    onClick={handleClearChat}
+                    className="bg-red-600 text-white px-3 py-2 rounded-md shadow-md hover:bg-red-700 transition duration-200"
+                >
+                    Clear
+                </button>
+            </div>
+
+            {/* Messages Section */}
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-900">
                 <div className="flex flex-col space-y-4">
                     {messages.map((msg, index) => (
-                        <div 
-                            key={index} 
-                            className={`p-3 rounded-lg text-sm ${msg.senderId === userId ? 'bg-blue-600 text-white self-end' : 'bg-gray-200 text-black self-start'}`}>
-                           
-                            <p className="mt-1">{msg.text}</p>
+                        <div
+                            key={index}
+                            className={`p-3 rounded-lg text-sm ${
+                                msg.senderId === userId ? 'bg-green-500 text-white self-end' : 'bg-gray-700 text-white self-start'
+                            }`}
+                        >
+                            <p>{msg.text}</p>
                         </div>
                     ))}
                 </div>
             </div>
-            <form onSubmit={handleSendMessage} className="flex items-center p-4 border-t border-gray-300 bg-white">
+
+            {/* Input Section */}
+            <form onSubmit={handleSendMessage} className="flex items-center p-4 border-t border-gray-700 bg-gray-800">
                 <input
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Type a message..."
-                    className="flex-1 p-3 border border-gray-300 rounded-md shadow-sm mr-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 p-3 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
-                <button 
-                    type="submit" 
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-700 transition duration-200 transform hover:scale-105">
+                <button
+                    type="submit"
+                    className="bg-green-600 text-white px-4 py-2 rounded-md ml-2 hover:bg-green-700 transition duration-200 transform hover:scale-105"
+                >
                     Send
                 </button>
             </form>
-            <button 
-                onClick={handleClearChat} 
-                className="m-4 bg-red-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-red-700 transition duration-200">
-                Clear Chat
-            </button>
         </div>
     );
 };
 
-export default Chat;
+export default ChatApp;

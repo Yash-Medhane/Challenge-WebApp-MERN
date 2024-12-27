@@ -24,7 +24,7 @@ const Login = () => {
         e.preventDefault();
 
         try {
-            const response = await axios.post('http://localhost:5000/login', formData);
+            const response = await axios.post('http://192.168.37.86:5000/login', formData);
             
             if (response.status === 200) {
                 const { user } = response.data; // Extract user from response

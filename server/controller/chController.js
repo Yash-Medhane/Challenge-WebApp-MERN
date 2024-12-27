@@ -87,9 +87,9 @@ exports.getUserDashboardData = async (req, res) => {
                 ]
             });
 
-            // Filter challenges into pending and completed
-            dashboardData.pendingChallenges = challenges.filter(challenge => challenge.status === 'pending');
-            dashboardData.completedChallenges = challenges.filter(challenge => challenge.status === 'completed');
+            const currentDate = new Date();
+            dashboardData.pendingChallenges = challenges.filter(challenge => challenge.status === 'pending' && new Date(challenge.deadline) >= currentDate);
+            dashboardData.completedChallenges = challenges.filter(challenge => challenge.status === 'completed' && new Date(challenge.deadline) >= currentDate);
         } else {
             dashboardData.partnerMessage = 'No partner is connected. Connect your partner now.';
         }
@@ -122,8 +122,8 @@ exports.getPartnersChallenges = async (req, res) => {
         }
 
 
-        // Check if any challenges have a null partnerUserId
-        const challengesWithNullPartner = challenges.filter(challenge => challenge.partnerId === null);
+        const currentDate = new Date();
+        const challengesWithNullPartner = challenges.filter(challenge => challenge.partnerId === null && new Date(challenge.deadline) >= currentDate);
         if (challengesWithNullPartner.length > 0) {
             return res.status(200).json({ 
                 message: "No partner connected. Connect your partner now.", 

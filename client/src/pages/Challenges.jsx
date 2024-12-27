@@ -21,7 +21,7 @@ const Challenges = ({ userId }) => {
             setLoading(true);
             setError(null);
             try {
-                const response = await axios.get(`http://localhost:5000/dashboard/${userId}/challenges/get`);
+                const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}/challenges/get`);
                 setChallenges(Array.isArray(response.data) ? response.data : []);
             } catch (err) {
                 console.error("Error fetching challenges:", err);
@@ -60,7 +60,7 @@ const Challenges = ({ userId }) => {
         };
 
         try {
-            const response = await axios.post(`http://localhost:5000/dashboard/${userId}/challenges/create`, newChallenge);
+            const response = await axios.post(`http://192.168.37.86:5000/dashboard/${userId}/challenges/create`, newChallenge);
             setChallenges((prevChallenges) => [...prevChallenges, response.data]);
             setSuccessMessage('Challenge created successfully!');
             resetForm();
@@ -83,7 +83,7 @@ const Challenges = ({ userId }) => {
         const confirmDelete = window.confirm("Are you sure you want to delete this challenge?");
         if (confirmDelete) {
             try {
-                await axios.delete(`http://localhost:5000/challenges/${challengeId}`);
+                await axios.delete(`http://192.168.37.86:5000/challenges/${challengeId}`);
                 setChallenges((prevChallenges) => prevChallenges.filter(challenge => challenge._id !== challengeId));
                 setSuccessMessage('Challenge deleted successfully!');
             } catch (err) {
