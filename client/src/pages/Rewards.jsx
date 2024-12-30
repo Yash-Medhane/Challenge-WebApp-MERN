@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaPlus, FaTrash } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 
 const Rewards = ({ userId }) => {
+    const navigate = useNavigate();
     const [rewards, setRewards] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -19,9 +21,20 @@ const Rewards = ({ userId }) => {
             setLoading(true);
             setError(null);
             try {
-                const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}/rewards/get`);
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    throw new Error("Token not found");
+                }
+                const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}/rewards/get`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
                 setRewards(Array.isArray(response.data) ? response.data : []);
             } catch (err) {
+                if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                    navigate('/'); 
+                }
                 console.error("Error fetching rewards:", err);
                 setError("No rewards created.");
                 setRewards([]);
@@ -91,15 +104,15 @@ const Rewards = ({ userId }) => {
     return (
         <div className=" flex-grow flex flex-col items-center p-6 md:p-8">
         <div className="w-full max-w-6xl flex-grow overflow-y-auto relative p-6 md:p-8 bg-gradient-to-r from-gray-800 to-gray-700 rounded-xl shadow-2xl">
-            <button
-                onClick={openModal}
-                className="absolute top-4 right-4 bg-gradient-to-r from-green-500 to-green-400 hover:from-green-600 hover:to-green-500 text-white py-3 px-6 flex items-center rounded-full shadow-lg transition duration-300 transform hover:scale-105"
-            >
-                <FaPlus className="mr-2" />
-                Create Reward
-            </button>
+        <button
+    onClick={openModal}
+    className="absolute top-2 right-0 sm:right-4 bg-gradient-to-r from-green-500 to-green-400 hover:from-green-600 hover:to-green-500 text-white py-2 px-4 flex items-center rounded-full shadow-lg transition duration-300 transform hover:scale-105"
+>
+    <FaPlus className="mr-2" />
+    <span className="hidden sm:inline">Create</span> 
+</button>
     
-            <h2 className="text-3xl md:text-4xl font-bold mb-8 text-yellow-400 text-center">🎁 Rewards Zone</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-8 my-2 text-blue-500 text-center">Partner Rewards</h2>
     
             {loading ? (
                 <p className="text-gray-400 text-center">Loading rewards...</p>
@@ -109,7 +122,7 @@ const Rewards = ({ userId }) => {
                 Array.isArray(rewards) && rewards.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {rewards.map((reward) => (
-                            <div key={reward._id} className="bg-gray-800 rounded-lg p-6 shadow-lg hover:shadow-2xl transition duration-300">
+                            <div key={reward._id} className={`bg-gray-800 ${reward.redeemed ? `border-green-500 border-r-8` : reward.deleted ? `border-red-500 border-r-8` : `border-yellow-500 border-r-8`} rounded-lg p-6 shadow-lg hover:shadow-2xl transition duration-300`}>
                                 <h3 className="text-lg font-bold text-white mb-2">{reward.reward}</h3>
                                 <p className="text-sm text-gray-400">Type: <span className="text-blue-300">{reward.rewardType}</span></p>
                                 <p className="text-sm text-gray-400">Coins Required: <span className="text-yellow-400">{reward.coinsRequired}</span></p>
@@ -169,13 +182,18 @@ const Rewards = ({ userId }) => {
                                 className="p-3 border rounded-lg bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 required
                             />
-                            <input
-                                type="date"
-                                value={deadline}
-                                onChange={(e) => setDeadline(e.target.value)}
-                                className="p-3 border rounded-lg bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            />
+                           <div className="flex flex-col mb-4">
+    <label htmlFor="deadline" className="text-blue-400 font-semibold mb-2">Deadline :</label>
+    <input
+        type="date"
+        value={deadline}
+        onChange={(e) => setDeadline(e.target.value)}
+        id="deadline"
+        className="p-3 border rounded-lg bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        required
+    />
+</div>
+
                             <button
                                 type="submit"
                                 className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white py-3 px-6 rounded-full shadow-lg transition duration-300"

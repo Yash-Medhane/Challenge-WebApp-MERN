@@ -97,17 +97,17 @@ exports.registerUser = async (req, res) => {
 
         // Send verification email
         const mailOptions = {
-            from: 'yashmedhane43@gmail.com',
+            from: 'softwareengineer612@gmail.com',
             to: email,
             subject: 'Verify your email address for Login',
             text: `Click the link to verify your email address: ${verificationLink}`,
             html: `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <h2 style="color: #4CAF50;">Welcome to [Your App Name]!</h2>
+                <h2 style="color: #4CAF50;">Welcome to Taskify!</h2>
                 
                 <p>Hi ${username},</p>
         
-                <p>Thank you for registering with [Your App Name]. We're excited to have you on board! To complete your registration and get started, please verify your email address by clicking the button below:</p>
+                <p>Thank you for registering with Taskify. We're excited to have you on board! To complete your registration and get started, please verify your email address by clicking the button below:</p>
         
                 <p style="text-align: center;">
                     <a href="${verificationLink}" style="display: inline-block; padding: 10px 20px; font-size: 16px; font-weight: bold; color: #fff; background-color: #4CAF50; border-radius: 5px; text-decoration: none;">Verify Email Address</a>
@@ -119,12 +119,12 @@ exports.registerUser = async (req, res) => {
         
                 <p>This link is valid for only 1 hour. If you don't verify your email within this time, you'll need to request a new verification link.</p>
         
-                <p>If you didn't sign up for [Your App Name], please ignore this email and no action will be taken.</p>
+                <p>If you didn't sign up for Taskify, please ignore this email and no action will be taken.</p>
         
-                <p>Thank you,<br>The [Your App Name] Team</p>
+                <p>Thank you,<br>Yash Medhane</p>
         
                 <hr>
-                <p style="font-size: 12px; color: #999;">If you have any issues, feel free to contact our support team at support@[yourdomain].com</p>
+                <p style="font-size: 12px; color: #999;">If you have any issues, feel free to contact with me at softwareengineer612@gmail.com</p>
             </div>
         `
          // Optional: HTML email
@@ -224,33 +224,11 @@ exports.getUser = async (req, res) => {
     }
 };
 
-
 exports.updateUser = async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-
-        if (!token) {
-            return res.status(401).json({ message: 'Unauthorized' });
-        }
-
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userIdFromToken = decoded.userId; // User ID from the token
-        const requestedUserId = req.params.userId; // Get userId from route parameters
-
-        // Check if the requested userId matches the userId from the token
-        if (userIdFromToken !== requestedUserId) {
-            return res.status(403).json({ message: 'Forbidden: You can only access your own profile' });
-        }
-
-        // Find the user by custom userId and exclude password from response
-        const user = await User.findOne({ userId: requestedUserId }).select('-password');
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
         // Destructure the fields from the request body
         const {
+            userId,
             username,
             email,
             coins,
@@ -267,9 +245,16 @@ exports.updateUser = async (req, res) => {
             preferences
         } = req.body;
 
+        // Find the user by the userId
+        const user = await User.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
         // Update the user document in the database
         const updatedUser = await User.findOneAndUpdate(
-            { userId: requestedUserId }, // Use custom userId for the update
+            { userId }, // Use userId for the update
             {
                 username,
                 email,
@@ -291,7 +276,7 @@ exports.updateUser = async (req, res) => {
 
         // Return the updated user data
         res.status(200).json({
-            id: updatedUser.userId, // Return the custom userId
+            id: updatedUser.userId, // Return the userId
             username: updatedUser.username,
             email: updatedUser.email,
             coins: updatedUser.coins,
@@ -314,7 +299,6 @@ exports.updateUser = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
-
 
 exports.deleteUser = async (req, res) => {
     try {

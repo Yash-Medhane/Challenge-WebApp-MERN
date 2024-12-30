@@ -2,65 +2,70 @@ import React, { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import { FaUserCircle } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 
 const ChatApp = ({ userId }) => {
+    const navigate = useNavigate();
     const [socket, setSocket] = useState(null);
     const [messages, setMessages] = useState(() => {
-        const savedMessages = localStorage.getItem('chatMessages');
-        return savedMessages ? JSON.parse(savedMessages) : [];
+        try {
+            const savedMessages = localStorage.getItem('chatMessages');
+            return savedMessages ? JSON.parse(savedMessages) : [];
+        } catch {
+            return [];
+        }
     });
     const [message, setMessage] = useState('');
     const [userData, setUserData] = useState(null);
     const [partnerId, setPartnerId] = useState(null);
-    const [partnerName, setPartnerName] = useState('Partner');
-    const [typing, setTyping] = useState(false);
+    const [partnerName, setPartnerName] = useState('Me');
     const [isTyping, setIsTyping] = useState(false);
 
+    // Fetch user data and partner ID
     useEffect(() => {
-        // Fetch user data and partner ID
+        if (!userId) return;
+
         const fetchUserData = async () => {
             try {
-                const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}/chat/get`);
+                const token = localStorage.getItem('token');
+                if (!token) throw new Error("Token not found");
+
+                const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}/chat/get`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
                 setUserData(response.data);
-                if (response.data) {
-                    setPartnerId(response.data.partnerUserId);
+                setPartnerId(response.data.partnerUserId);
+                setPartnerName(response.data.partnerUserName || 'Me');
+            } catch (err) {
+                if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                    navigate('/');
                 }
-            } catch (error) {
-                console.error("Error fetching user data: ", error);
+                console.error("Error fetching user data:", err);
             }
         };
 
         fetchUserData();
-    }, [userId]);
+    }, [userId, navigate]);
 
+    // Initialize and handle socket connection
     useEffect(() => {
-        // Fetch partner's name when partnerId is updated
-        const fetchPartnerName = async () => {
-            if (!partnerId) return;
-            try {
-                const response = await axios.get(`http://192.168.37.86:5000/dashboard/${partnerId}/chat/get`);
-                setPartnerName(response.data.username || 'Partner');
-            } catch (error) {
-                console.error("Error fetching partner data: ", error);
-            }
-        };
+        if (!userId || !partnerId) return;
 
-        fetchPartnerName();
-    }, [partnerId]);
-
-    useEffect(() => {
         const newSocket = io('http://192.168.37.86:5000');
         setSocket(newSocket);
 
         newSocket.on('connect', () => {
-            if (userId && partnerId) {
-                newSocket.emit('joinRoom', { userId, partnerId });
-            }
+            console.log("Socket connected:", newSocket.id);
+            newSocket.emit('joinRoom', { userId, partnerId });
         });
 
-        newSocket.on('receiveMessage', (messageData) => {
+        newSocket.on('messageReceived', ({ roomId, message }) => {
+            console.log('check 1');
+            console.log(`Message received in room ${roomId}:`, message);
             setMessages((prevMessages) => {
-                const updatedMessages = [...prevMessages, messageData];
+                console.log('check 2');
+                const updatedMessages = [...prevMessages, message];
                 localStorage.setItem('chatMessages', JSON.stringify(updatedMessages));
                 return updatedMessages;
             });
@@ -69,11 +74,16 @@ const ChatApp = ({ userId }) => {
         newSocket.on('typing', () => setIsTyping(true));
         newSocket.on('stopTyping', () => setIsTyping(false));
 
+        newSocket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err);
+        });
+
         return () => {
             newSocket.disconnect();
         };
-    }, [userId, partnerId]);
+    }, [userId, partnerId,isTyping]);
 
+    // Handle sending a message
     const handleSendMessage = (e) => {
         e.preventDefault();
 
@@ -83,28 +93,25 @@ const ChatApp = ({ userId }) => {
                 receiverId: partnerId,
                 text: message,
             };
-            socket.emit('sendMessage', messageData);
-            setMessages((prevMessages) => {
-                const updatedMessages = [...prevMessages, messageData];
-                localStorage.setItem('chatMessages', JSON.stringify(updatedMessages));
-                return updatedMessages;
-            });
+            const sortedRoomId = [userId, partnerId].sort().join('-');
+            socket.emit('newMessage', { roomId: sortedRoomId, message: messageData });
+
+
             setMessage('');
-            socket.emit('stopTyping');
         }
     };
 
+    // Handle clearing chat messages
     const handleClearChat = () => {
         setMessages([]);
         localStorage.removeItem('chatMessages');
     };
 
     return (
-        <div className="flex flex-col h-screen max-w-lg mx-auto bg-gradient-to-br from-purple-600 to-blue-500 rounded-lg shadow-lg overflow-hidden">
+        <div className="flex flex-col h-screen max-w-lg mx-auto bg-gradient-to-br rounded-lg shadow-lg overflow-hidden">
             {/* Header Section */}
             <div className="flex items-center justify-between bg-gray-800 p-4 text-white shadow-md">
                 <div className="flex items-center space-x-2">
-                    {/* Human Icon */}
                     <FaUserCircle className="text-blue-400 text-4xl" />
                     <h2 className="font-bold">{partnerName}</h2>
                 </div>
@@ -123,13 +130,16 @@ const ChatApp = ({ userId }) => {
                         <div
                             key={index}
                             className={`p-3 rounded-lg text-sm ${
-                                msg.senderId === userId ? 'bg-green-500 text-white self-end' : 'bg-gray-700 text-white self-start'
+                                msg.senderId === userId
+                                    ? 'bg-green-500 text-white self-end'
+                                    : 'bg-gray-700 text-white self-start'
                             }`}
                         >
                             <p>{msg.text}</p>
                         </div>
                     ))}
                 </div>
+                {isTyping && <p className="text-gray-400 italic">Partner is typing...</p>}
             </div>
 
             {/* Input Section */}
@@ -138,6 +148,8 @@ const ChatApp = ({ userId }) => {
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={() => socket.emit('typing')}
+                    onBlur={() => socket.emit('stopTyping')}
                     placeholder="Type a message..."
                     className="flex-1 p-3 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 />

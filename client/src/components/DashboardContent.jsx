@@ -16,9 +16,9 @@ const DashboardContent = ({ userId }) => {
     const [taskName, setTaskName] = useState('');
 
     const difficultyColors = {
-        easy: 'text-green-400',
-        medium: 'text-yellow-400',
-        hard: 'text-red-600',
+        easy: 'text-green-300',
+        medium: 'text-yellow-300',
+        hard: 'text-red-400',
     };
 
     useEffect(() => {
@@ -44,6 +44,9 @@ const DashboardContent = ({ userId }) => {
             setPendingTasks(pendingChallenges || []);
             setCompletedTasks(completedChallenges || []);
         } catch (err) {
+            if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                navigate('/'); 
+            }
             console.error("Error fetching tasks:", err);
             setError("Failed to load tasks. Please try again.");
         } finally {
@@ -104,13 +107,13 @@ const DashboardContent = ({ userId }) => {
     return (
         <div className="bg-gray-900 flex-grow flex flex-col items-center p-6 md:p-8 overflow-hidden">
             <div className="w-full max-w-6xl flex-grow overflow-y-auto relative p-6 md:p-8 bg-gray-800 rounded-lg shadow-lg">
-                <button
-                    onClick={openCreateModal}
-                    className="absolute top-4 right-4 bg-green-500 hover:bg-green-600 text-white py-2 px-4 flex items-center rounded-lg shadow-md transition duration-200 transform hover:scale-105"
-                >
-                    <FaPlus className="mr-2" />
-                    Create
-                </button>
+            <button
+    onClick={openCreateModal}
+    className={`${isConnected ? 'block' : 'hidden'} absolute top-4 right-4 bg-green-500 hover:bg-green-600 text-white py-2 px-4 flex items-center rounded-lg shadow-md transition duration-200 transform hover:scale-105`}
+>
+    <FaPlus className="mr-2" />
+    Create
+</button>
 
                 {/* Create Modal for choosing between Reward and Challenges */}
                 {isCreateModalOpen && (
@@ -177,12 +180,12 @@ const DashboardContent = ({ userId }) => {
         {pendingTasks.map(task => (
             <li key={task._id} className={`mb-3 flex flex-col md:flex-row justify-between items-start md:items-center p-4 rounded-lg shadow-md transition-transform transform hover:scale-105 ${difficultyColors[task.difficulty]}`}>
                 <div className="flex flex-col mb-2 md:mb-0">
-                    <span className={`font-bold text-white text-lg ${difficultyColors[task.difficulty]}`}>{task.challenge}</span>
+                    <span className={`font-bold text-green-400 text-lg ${difficultyColors[task.difficulty]}`}>{task.challenge}</span>
                     <span className="text-sm text-gray-400">Due: {new Date(task.deadline).toLocaleDateString()}</span>
                 </div>
                 <div className="flex items-center">
                     <span className="text-sm text-slate-300 font-bold mr-3 flex items-center">
-                        <FaCoins className="inline mr-1 text-yellow-300 h-5 w-5" />
+                        <FaCoins className="inline mr-1 text-yellow-400 h-5 w-5" />
                         {task.coins} 
                     </span>
                     <button
@@ -212,7 +215,7 @@ const DashboardContent = ({ userId }) => {
                     {task.challenge}
                 </h3>
                 <p className="text-sm text-white mb-1">
-                    <FaCoins className="inline mr-1 text-yellow-300" />
+                    <FaCoins className="inline mr-1 text-yellow-400" />
                     {task.coins} Coins
                 </p>
             </div>
@@ -225,11 +228,16 @@ const DashboardContent = ({ userId }) => {
                         </div>
                     </div>
                 ) : (
-                    <div className="mt-6">
-                        <h2 className="text-xl text-red-500">You are currently disconnected.</h2>
-                        <p className="text-gray-400">Please connect to view your tasks.</p>
-                        <button onClick={handleConnect}>Connect</button>
-                    </div>
+                    <div className="mt-6 p-6 bg-slate-800 rounded-lg shadow-lg text-center">
+    <h2 className="text-2xl font-bold text-red-500 mb-4">You are currently disconnected.</h2>
+    <p className="text-lg text-gray-400 mb-6">Please connect to view your tasks.</p>
+    <button 
+        onClick={handleConnect} 
+        className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg transform transition duration-300 hover:scale-105 hover:shadow-2xl">
+        Connect
+    </button>
+</div>
+
                 )}
             </div>
         </div>

@@ -54,15 +54,9 @@ exports.createPartnersReward = async (req, res) => {
 };
 
 
-// Get rewards for a specific user
 exports.getUserRewards = async (req, res) => {
     
     const userId = req.params.userId;
-    console.log('Route hit:', req.url);
-console.log('Params:', req.params);
-
-    console.log(userId);
-
     try {
         // Find the user by ID
         const user = await User.findOne({userId:userId});
@@ -79,20 +73,17 @@ console.log('Params:', req.params);
 
         // If partner found, fetch rewards related to the user or their partner
         const rewards = await Reward.find({
-            $or: [
+            $and: [
                 { selfId: userId },
-                { partnerId: user.partnerId }
+                { partnerId: user.partnerUserId }
             ]
         });
-
-        const currentDate = new Date();
-        const newRewards = rewards.filter(reward => new Date(reward.deadline) >= currentDate);
-        if (newRewards.length === 0) {
+        if (rewards.length === 0) {
             return res.status(404).json({ message: 'No rewards found !' });
         }
 
         // Return rewards found
-        res.status(200).json(newRewards);
+        res.status(200).json(rewards);
     } catch (error) {
         console.error(error); // Log the error for debugging
         res.status(500).json({ message: 'Server error.' });
@@ -120,20 +111,17 @@ exports.getPartnerReward = async (req, res) => {
 
         // If partner found, fetch rewards related to the user or their partner
         const rewards = await Reward.find({
-            $or: [
-                { selfId: user.partnerId },
+            $and: [
+                { selfId: user.partnerUserId },
                 { partnerId: userId }
             ]
-        });
+        });        
 
-        const currentDate = new Date();
-        const newRewards = rewards.filter(reward => new Date(reward.deadline) >= currentDate);
-        if (newRewards.length === 0) {
+        if (rewards.length === 0) {
             return res.status(404).json({ message: 'No rewards found.' });
         }
 
-        // Return rewards found
-        res.status(200).json(newRewards);
+        res.status(200).json(rewards);
     } catch (error) {
         console.error(error); // Log the error for debugging
         res.status(500).json({ message: 'Server error.' });
@@ -174,7 +162,13 @@ exports.redeemReward = async (req, res) => {
             return res.status(400).json({ message: "Reward already redeemed." });
         }
 
-        // Find the user who is redeeming the reward (selfId is assumed to be in the reward object)
+        const currentDate = new Date();
+        const rewardDeadline = new Date(reward.deadline);
+        if(rewardDeadline < currentDate){
+            reward.deleted = true;
+            await reward.save();
+            return res.status(200).json({ message: "Reward has already expired." });
+        }
         const user = await User.findOne({userId:reward.selfId});
         if (!user) {
             return res.status(404).json({ message: "User not found." });

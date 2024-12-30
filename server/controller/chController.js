@@ -81,7 +81,7 @@ exports.getUserDashboardData = async (req, res) => {
         if (user.partnerUserId && user.partnerUserId.length > 0) { // Updated check
             // Fetch challenges related to the user and partner
             const challenges = await Challenge.find({
-                $or: [
+                $and: [
                     { selfId: userId },
                     { partnerId: user.partnerUserId }
                 ]
@@ -115,7 +115,12 @@ exports.getPartnersChallenges = async (req, res) => {
         }
 
         // Find all challenges where partnerUserId matches the user's partnerUserId
-        const challenges = await Challenge.find({ selfId: user.partnerUserId });
+        const challenges = await Challenge.find({
+                $and: [
+                    { selfId: user.partnerUserId },
+                    { partnerId: userId }
+                ]
+            });
     
         if (challenges.length === 0) {
             return res.status(404).json({ message: "No challenges found for this user." });

@@ -62,7 +62,7 @@ const NotificationPopup = ({ userId }) => {
                         <p className="flex-1">{notification.message}</p>
                         {notification.type === "partner_request" && (
                             <button
-                                onClick={() => handleAccept(notification.notificationId, notification.senderId)}
+                                onClick={() => handleAccept(notification._id, notification.senderId)}
                                 className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600 transition duration-200"
                             >
                                 Accept

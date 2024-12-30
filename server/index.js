@@ -4,17 +4,21 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
-const http = require('http'); // Import HTTP module
-const { Server } = require('socket.io'); // Import Socket.IO
-const nodemailer = require('nodemailer'); // Import nodemailer
-const userRoutes = require('./routes/userRoute'); // Import user routes
+const http = require('http');
+const { Server } = require('socket.io');
+const nodemailer = require('nodemailer');
+const userRoutes = require('./routes/userRoute');
 
 // Load environment variables
 dotenv.config();
 const PORT = process.env.PORT || 5000;
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: ["http://localhost:5173", "http://192.168.37.86:5173"], // Allow multiple origins
+    methods: ["GET", "POST","PUT","DELETE"],
+    credentials: true
+}));
 app.use(express.json());
 
 // Email sending route
@@ -35,8 +39,8 @@ app.post('/send', async (req, res) => {
         });
 
         const mailOptions = {
-            from: process.env.EMAIL_USER, // Sender email address
-            to: process.env.EMAIL,        // Recipient email address (website owner)
+            from: process.env.EMAIL_USER,
+            to: process.env.EMAIL,
             subject: '✨ New Website Contact Inquiry Received!',
             text: `
                 📬 New Inquiry Details
@@ -72,42 +76,6 @@ mongoose.connect(mongoURI, {
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.log('MongoDB connection error:', err));
 
-// Set up storage for multer
-const storage = multer.diskStorage({
-    destination: './uploads/',
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Append timestamp to avoid filename collisions
-    },
-});
-
-// Initialize multer for file upload
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 10000000 }, // Limit size to 10MB (adjust as needed)
-    fileFilter: (req, file, cb) => {
-        const filetypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/; // Allowed file types
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = filetypes.test(file.mimetype);
-
-        if (mimetype && extname) {
-            return cb(null, true);
-        } else {
-            cb(new Error('Invalid file type! Only images and documents are allowed.'));
-        }
-    },
-});
-
-// Image upload route
-app.post('/upload', upload.single('file'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ message: 'No file uploaded' });
-    }
-    res.status(200).json({ filePath: `/uploads/${req.file.filename}` });
-});
-
-// Serve static files from the uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Test route
 app.get('/test', (req, res) => {
     res.send("Backend is accessible");
@@ -120,38 +88,42 @@ app.use('/', userRoutes);
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", // Adjust this based on your frontend domain
+        origin: ["http://localhost:5173", "http://192.168.37.86:5173"], // Allow both origins
+        methods: ["GET", "POST","PUT","DELETE"],
+        credentials: true
     },
 });
 
-// Rooms object to manage game states
-const rooms = {}; // Initialize rooms object
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
+    // Joining rooms for private communication
     socket.on('joinRoom', ({ userId, partnerId }) => {
-        const roomId = `${userId}-${partnerId}`; // Create a unique room ID
+        const roomId = [userId, partnerId].sort().join('-');
         socket.join(roomId);
         console.log(`User ${socket.id} joined room: ${roomId}`);
+        
+        // Notify the user that they successfully joined the room
+        socket.emit('roomJoined', { roomId });
     });
 
-    socket.on('makeMove', ({ roomId, index }) => {
-        const room = rooms[roomId];
-        if (room && room.board[index] === null) {
-            room.board[index] = room.currentPlayer;
-            room.currentPlayer = room.currentPlayer === 'X' ? 'O' : 'X';
-            io.to(roomId).emit('gameUpdate', room);
-        }
+    // Handling new messages in rooms
+    socket.on('newMessage', ({ roomId, message }) => {
+        console.log(`New message in room ${roomId}:`, message);
+
+        // Broadcast the message to all clients in the room
+        io.to(roomId).emit('messageReceived', { roomId, message });
     });
 
+    // Handle disconnection
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
     });
 });
 
 // Start the server
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT,() => {
     console.log(`Server running at http://localhost:${PORT}`);
 });

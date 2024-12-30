@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FaCoins, FaClock, FaAward } from 'react-icons/fa'; 
+import { useNavigate } from 'react-router-dom';
 
 const Store = ({ userId }) => {
+    const navigate = useNavigate();
     const [rewards, setRewards] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -12,7 +14,15 @@ const Store = ({ userId }) => {
         setLoading(true);
         setError('');
         try {
-            const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}/rewards/get-my-rewards`);
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error("Token not found");
+            }
+            const response = await axios.get(`http://192.168.37.86:5000/dashboard/${userId}/rewards/get-my-rewards`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
             if (Array.isArray(response.data)) {
                 setRewards(response.data);
             } else {
@@ -20,6 +30,9 @@ const Store = ({ userId }) => {
                 setRewards([]);
             }
         } catch (err) {
+            if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                navigate('/'); 
+            }
             console.error('Error fetching rewards:', err.message);
             setError(err.response?.data?.message || 'Failed to fetch rewards.');
         } finally {
@@ -47,13 +60,13 @@ const Store = ({ userId }) => {
     const getCardColor = (type) => {
         switch (type) {
             case 'gold':
-                return 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600';
+                return 'border-yellow-500 border-r-8';
             case 'silver':
-                return 'bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600';
-            case 'bronze':
-                return 'bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600';
+                return 'border-gray-500 border-r-8';
+            case 'diamond':
+                return 'border-orange-500 border-r-8';
             default:
-                return 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600';
+                return 'border-red-500 border-r-8';
         }
     };
 
@@ -78,7 +91,7 @@ const Store = ({ userId }) => {
                     rewards.map((reward) => (
                         <div
                             key={reward._id}
-                            className={`rounded-lg shadow-xl p-6 ${getCardColor(reward.rewardType)} text-white transform hover:scale-105 transition-transform duration-300`}
+                            className={`rounded-lg shadow-xl bg-gray-900 p-6  ${reward.redeemed ? `border-green-500 border-r-8` : reward.deleted ? `border-red-500 border-r-8` : `border-yellow-500 border-r-8`} text-white transform hover:scale-105 transition-transform duration-300`}
                         >
                             <h2 className="text-2xl font-semibold flex items-center">
                                 <FaAward className="mr-2" />
@@ -95,12 +108,12 @@ const Store = ({ userId }) => {
                                 <span><strong>Deadline:</strong> {formatDeadline(reward.deadline)}</span>
                             </div>
                             <p className="mt-4 font-medium">
-                                <strong>Status:</strong> {reward.redeemed ? 'Redeemed' : 'Available'}
+                                <strong>Status:</strong> {reward.redeemed ? 'Redeemed' : reward.deleted ? 'Expired' : 'Available'}
                             </p>
                             {!reward.redeemed && (
                                 <button
                                     onClick={() => redeemReward(reward._id)}
-                                    className="mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 rounded-full shadow-md transition duration-300"
+                                    className={`${reward.deleted ? `hidden` : `block`} mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 rounded-full shadow-md transition duration-300`}
                                 >
                                     Redeem
                                 </button>

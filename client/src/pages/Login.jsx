@@ -44,9 +44,9 @@ const Login = () => {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-80">
-                <h1 className="text-2xl font-semibold text-center mb-6">Login</h1>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-800">
+            <div className="bg-slate-900 p-6 rounded-lg shadow-lg w-80">
+                <h1 className="text-2xl font-bold text-white text-center mb-6">Login</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
@@ -85,7 +85,7 @@ const Login = () => {
                     >
                         Login
                     </button>
-                    <p className="text-sm text-center mt-4">
+                    <p className="text-sm text-white text-center mt-4">
                         Don't have an account?{' '}
                         <a
                             href="/register"

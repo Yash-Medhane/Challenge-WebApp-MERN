@@ -5,8 +5,9 @@ exports.getUserPartnerData = async (req, res) => {
     const { userId } = req.params;
 
     try {
+        console.log("main :",userId);
         // Fetch the user data
-        const user = await User.findOne({ userId });
+        const user = await User.findOne({ userId:userId });
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -26,6 +27,7 @@ exports.getUserPartnerData = async (req, res) => {
             profilePicture: user.profilePicture,
         });
     } catch (error) {
+        console.log("error ahe ha : ",error);
         console.error("Error fetching user and partner data:", error);
         res.status(500).json({ message: 'Server error' });
     }

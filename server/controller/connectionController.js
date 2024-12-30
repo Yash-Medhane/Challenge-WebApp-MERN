@@ -23,6 +23,35 @@ exports.getUserNotifications = async (req, res) => {
     }
 };
 
+exports.disConnect = async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const user = await User.findOne({ userId: userId }); 
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        if (user.isConnected) {
+            const partner = await User.findOne({ userId: user.partnerUserId }); 
+            if (partner) {
+                partner.isConnected = false;
+                partner.partnerUserId = '';
+                await partner.save(); 
+            }
+
+            user.isConnected = false;
+            user.partnerUserId = '';
+            await user.save();
+
+            return res.status(200).json({ message: "Successfully Disconnected." });
+        } else {
+            return res.status(400).json({ message: "Already Disconnected." });
+        }
+    } catch (error) {
+        console.error("Error disconnecting:", error);
+        return res.status(500).json({ message: "Internal Server Error." });
+    }
+};
 
 
 exports.deleteNotification = async (req, res) => {
@@ -116,6 +145,7 @@ exports.acceptPartnerRequest = async (req, res) => {
     const { notificationId, userId, partnerId } = req.body; // userId and partnerId should be the UUIDs of the current user and their partner
 
     try {
+        console.log("notificationId : ",notificationId)
         const user = await User.findOne({ userId });
         const partner = await User.findOne({ userId: partnerId }); // Partner user
 
@@ -138,8 +168,6 @@ exports.acceptPartnerRequest = async (req, res) => {
         // Save both users
         await user.save();
         await partner.save();
-
-        // Attempt to delete notification and check if it was found and deleted
         const deletedNotification = await Notification.findByIdAndDelete(notificationId);
         if (!deletedNotification) {
             return res.status(404).json({ message: "Notification not found." });
