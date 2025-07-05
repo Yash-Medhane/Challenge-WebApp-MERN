@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
-const multer = require('multer');
 const http = require('http');
 const { Server } = require('socket.io');
 const nodemailer = require('nodemailer');
@@ -14,11 +13,14 @@ dotenv.config();
 const PORT = process.env.PORT || 5000;
 
 const app = express();
+
+// CORS setup using .env variable
 app.use(cors({
-    origin: ["http://localhost:5173", "http://192.168.37.86:5173"], // Allow multiple origins
-    methods: ["GET", "POST","PUT","DELETE"],
+    origin: [process.env.CLIENT_URL],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
 }));
+
 app.use(express.json());
 
 // Email sending route
@@ -40,21 +42,21 @@ app.post('/send', async (req, res) => {
 
         const mailOptions = {
             from: process.env.EMAIL_USER,
-            to: process.env.EMAIL,
+            to: process.env.EMAIL_RECEIVER,
             subject: '✨ New Website Contact Inquiry Received!',
             text: `
-                📬 New Inquiry Details
+📬 New Inquiry Details
 
-                🧑‍💻 Sender Information:
-                - Email: ${email}
-                - Type of Message: ${category}
+🧑‍💻 Sender Information:
+- Email: ${email}
+- Type of Message: ${category}
 
-                📝 Message Content:
-                ---------------------------------------------------
-                "${message}"
-                ---------------------------------------------------
+📝 Message Content:
+---------------------------------------------------
+"${message}"
+---------------------------------------------------
 
-                📅 Received On: ${new Date().toLocaleString()}
+📅 Received On: ${new Date().toLocaleString()}
             `,
         };
 
@@ -68,17 +70,16 @@ app.post('/send', async (req, res) => {
 });
 
 // MongoDB connection
-const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/challengeApp';
-mongoose.connect(mongoURI, {
+mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
-.then(() => console.log('MongoDB connected successfully'))
-.catch(err => console.log('MongoDB connection error:', err));
+.then(() => console.log('✅ MongoDB connected successfully'))
+.catch(err => console.log('❌ MongoDB connection error:', err));
 
 // Test route
 app.get('/test', (req, res) => {
-    res.send("Backend is accessible");
+    res.send("✅ Backend is accessible");
 });
 
 // User routes
@@ -88,42 +89,35 @@ app.use('/', userRoutes);
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: ["http://localhost:5173", "http://192.168.37.86:5173"], // Allow both origins
-        methods: ["GET", "POST","PUT","DELETE"],
+        origin: [process.env.CLIENT_URL],
+        methods: ["GET", "POST", "PUT", "DELETE"],
         credentials: true
     },
 });
 
-
 // WebSocket connection handling
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    console.log('🔌 User connected:', socket.id);
 
-    // Joining rooms for private communication
     socket.on('joinRoom', ({ userId, partnerId }) => {
         const roomId = [userId, partnerId].sort().join('-');
         socket.join(roomId);
-        console.log(`User ${socket.id} joined room: ${roomId}`);
-        
-        // Notify the user that they successfully joined the room
+        console.log(`👥 User ${socket.id} joined room: ${roomId}`);
         socket.emit('roomJoined', { roomId });
     });
 
-    // Handling new messages in rooms
     socket.on('newMessage', ({ roomId, message }) => {
-        console.log(`New message in room ${roomId}:`, message);
-
-        // Broadcast the message to all clients in the room
+        console.log(`💬 New message in room ${roomId}:`, message);
         io.to(roomId).emit('messageReceived', { roomId, message });
     });
 
-    // Handle disconnection
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
+        console.log('❌ User disconnected:', socket.id);
     });
 });
 
 // Start the server
-server.listen(PORT,() => {
-    console.log(`Server running at http://localhost:${PORT}`);
+server.listen(PORT, () => {
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
+
